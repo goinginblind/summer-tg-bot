@@ -1,3 +1,3 @@
 # Chat_bot_En_plus
 
-This is home of RAG-system for En+ Digital, developed on Summer Scool AI-2025 "Intellegence" fond.
+This is the home of a RAG system for En+ Digital, developed during the 2025 'Intelligence' Foundation Summer School.
