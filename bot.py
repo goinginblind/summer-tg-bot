@@ -1,3 +1,7 @@
+from tg_rag_manager import Tg_rag_manager
+
+
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
