@@ -1,3 +1,4 @@
 .env
 .venv
 *.pyc
+bot_logs.csv
