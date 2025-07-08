@@ -1,3 +1,19 @@
+import numpy as np
+# import pandas as pd
+# import torch
+# import transformers
+import langchain
+from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import UnstructuredWordDocumentLoader
+from langchain_core.runnables import RunnablePassthrough
+from langchain.chains import RetrievalQA
+from langchain.prompts import ChatPromptTemplate
+import os
+import openai
+
 class RAGForChatBot():
 
   def __init__(self, documents=None, llm=None, embedding_model=None, prompt_template=None, splitter=None, chunk_size=1000, overlap=200, n_chunks_to_pass=10, save_vdb=True, save_vdb_path='faiss_database_of_documents'):
@@ -58,10 +74,9 @@ class RAGForChatBot():
     chain = (
     args_for_template
     | template
-    | llm
+    | self.llm
 
       )
-    print(type(args_for_template), type(template), type(llm))
     return chain.invoke(query)
 
 def make_rag():
