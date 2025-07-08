@@ -16,8 +16,6 @@ from telegram.ext import (
 
 
 # Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
-# Его в млучае чего можно заменить на ДБ или ДБ + редис если вдруг внезапно 
-# кому-то на кой-то хер понадобится делать это всё с нескольких серверов
 user_states = {}
 
 FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
