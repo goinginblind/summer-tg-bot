@@ -1,14 +1,21 @@
-from dotenv import load_dotenv
+import csv
 import os
+from datetime import datetime
+
+from dotenv import load_dotenv
 from openai import OpenAI
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler,
-    MessageHandler, filters
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
 )
 
 
-# Юзер стейт: {user_id: {"prefix": "Физическое лицо", "state": "awaiting_question"}}
+# Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
 # Его в млучае чего можно заменить на ДБ или ДБ + редис если вдруг внезапно 
 # кому-то на кой-то хер понадобится делать это всё с нескольких серверов
 user_states = {}
@@ -41,7 +48,7 @@ async def handle_prefix_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     ])
     await context.bot.send_message(
         chat_id=query.message.chat_id,
-        text="Напишите, пожалуйста, ваш запрос:",
+        text="Напишите, пожалуйста, ваш вопрос или нажмите кнопку, чтобы выбрать другую категорию:",
         reply_markup=back_button
     )
 
@@ -71,6 +78,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ВОТ ТУТ БУДЕТ ПАРС В ЛЛМ И ПОЛУЧЕНИЕ ОТВЕТА
 
     response = f"[Ваш ответ: {full_prompt}]" # Это плейсхолдееер
+    log_interaction(user_id, full_prompt, response)
 
     # Отправляем юзеру
     await update.message.reply_text(
@@ -90,9 +98,22 @@ async def ask_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=FACE_CHOICE_KEYBOARD
     )
 
+def log_interaction(user_id: int, question: str, response: str):
+    timestamp = datetime.now().isoformat(sep=' ', timespec='seconds')
+    with open(LOG_FILE, mode="a", newline='', encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow([user_id, timestamp, question, response])
+
+
 if __name__ == '__main__':
     load_dotenv()
     BOT_TOKEN = os.getenv("BOT_TOKEN")
+    LOG_FILE = "bot_logs.csv"
+
+    if not os.path.exists(LOG_FILE):
+        with open(LOG_FILE, mode="w", newline='', encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["user_id", "timestamp", "question", "response"])
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
