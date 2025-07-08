@@ -13,15 +13,15 @@ from telegram.ext import (
 # кому-то на кой-то хер понадобится делать это всё с нескольких серверов
 user_states = {}
 
-CHOICE_KEYBOARD = InlineKeyboardMarkup([
+FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton("Физическое лицо", callback_data="prefix:Физическое лицо")],
     [InlineKeyboardButton("Юридическое лицо", callback_data="prefix:Юридическое лицо")]
 ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Здравствуйте, я робот-помощник.\nВыберите, пожалуйста, категорию:",
-        reply_markup=CHOICE_KEYBOARD
+        "Здравствуйте, я робот-помощник.\nВыберите, пожалуйста, категорию вопроса:",
+        reply_markup=FACE_CHOICE_KEYBOARD
     )
 
 async def handle_prefix_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,7 +53,7 @@ async def go_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text="Пожалуйста, выберите категорию вопроса:",
-        reply_markup=CHOICE_KEYBOARD
+        reply_markup=FACE_CHOICE_KEYBOARD
     )
 
 async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,7 +69,6 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_prompt = f"{face}: {query}"
     
     # ВОТ ТУТ БУДЕТ ПАРС В ЛЛМ И ПОЛУЧЕНИЕ ОТВЕТА
-
 
     response = f"[Ваш ответ: {full_prompt}]" # Это плейсхолдееер
 
@@ -88,7 +87,7 @@ async def ask_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text="Выберите, пожалуйста:",
-        reply_markup=CHOICE_KEYBOARD
+        reply_markup=FACE_CHOICE_KEYBOARD
     )
 
 if __name__ == '__main__':
@@ -96,9 +95,6 @@ if __name__ == '__main__':
     BOT_TOKEN = os.getenv("BOT_TOKEN")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_prefix_choice, pattern="^prefix:"))
