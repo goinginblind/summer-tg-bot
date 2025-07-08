@@ -112,8 +112,8 @@ if __name__ == '__main__':
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     LOG_FILE = "bot_logs.csv"
     OPENAI_KEY = os.getenv("OPENAI_KEY")
-    
-    rag = make_rag()
+
+    rag = make_rag(OPENAI_KEY)
 
     if not os.path.exists(LOG_FILE):
         with open(LOG_FILE, mode="w", newline='', encoding="utf-8") as file:

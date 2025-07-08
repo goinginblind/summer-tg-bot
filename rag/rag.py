@@ -16,7 +16,7 @@ import openai
 
 class RAGForChatBot():
 
-  def __init__(self, documents=None, llm=None, embedding_model=None, prompt_template=None, splitter=None, chunk_size=1000, overlap=200, n_chunks_to_pass=10, save_vdb=True, save_vdb_path='faiss_database_of_documents'):
+  def __init__(self, key=None, documents=None, llm=None, embedding_model=None, prompt_template=None, splitter=None, chunk_size=1000, overlap=200, n_chunks_to_pass=10, save_vdb=True, save_vdb_path='faiss_database_of_documents'):
 
       if documents:
         self.docs = documents
@@ -79,13 +79,13 @@ class RAGForChatBot():
       )
     return chain.invoke(query)
 
-def make_rag():
+def make_rag(key):
   loader = UnstructuredWordDocumentLoader('documents.docx', encoding='utf-8')
   documents = loader.load()
   splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
   chunks = splitter.split_documents(documents)
-  llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
-  embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+  llm = ChatOpenAI(openai_api_key=key, model_name="gpt-4o-mini", temperature=0)
+  embedding = OpenAIEmbeddings(api_key=key, model="text-embedding-3-small")
   vectorstore = FAISS.from_documents(documents=chunks[:5], embedding=embedding)
   batch_size = 100
   for i in range(5, len(chunks), batch_size):
