@@ -14,6 +14,8 @@ from telegram.ext import (
     filters,
 )
 
+from rag.rag import RAGForChatBot, make_rag
+
 
 # Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
 user_states = {}
@@ -75,7 +77,9 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ВОТ ТУТ БУДЕТ ПАРС В ЛЛМ И ПОЛУЧЕНИЕ ОТВЕТА
 
-    response = f"[Ваш ответ: {full_prompt}]" # Это плейсхолдееер
+    response = rag.get_answer(query=query) # Должно сработать 
+    response = response.content
+    
     log_interaction(user_id, full_prompt, response)
 
     # Отправляем юзеру
@@ -107,6 +111,8 @@ if __name__ == '__main__':
     load_dotenv()
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     LOG_FILE = "bot_logs.csv"
+
+    rag = make_rag()
 
     if not os.path.exists(LOG_FILE):
         with open(LOG_FILE, mode="w", newline='', encoding="utf-8") as file:
