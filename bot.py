@@ -1,9 +1,11 @@
-import csv
 import os
+import csv
 from datetime import datetime
 
 from dotenv import load_dotenv
+
 from openai import OpenAI
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,7 +16,12 @@ from telegram.ext import (
     filters,
 )
 
-from rag.rag import RAGForChatBot, make_rag
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from database.queries import add_log
+
+from rag.rag import make_rag, make_prompt, get_answer_to_query
 
 
 # Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
@@ -72,19 +79,17 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     face = user_data["prefix"]
     query = update.message.text
-
-    full_prompt = f"{face}: {query}"
     
     # ВОТ ТУТ БУДЕТ ПАРС В ЛЛМ И ПОЛУЧЕНИЕ ОТВЕТА
+    system_prompt=make_prompt(face=face)
+    answer = get_answer_to_query(query, system_prompt, rag)
 
-    response = rag.get_answer(query=query) # Должно сработать 
-    response = response.content
-
-    log_interaction(user_id, full_prompt, response)
+    # Лог в ДБ
+    add_log(session=session, user_id=user_id, question=query, response=answer)
 
     # Отправляем юзеру
     await update.message.reply_text(
-        text=response,
+        text=answer,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("Задать другой вопрос", callback_data="ask_another")]
         ])
@@ -100,27 +105,20 @@ async def ask_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=FACE_CHOICE_KEYBOARD
     )
 
-def log_interaction(user_id: int, question: str, response: str):
-    timestamp = datetime.now().isoformat(sep=' ', timespec='seconds')
-    with open(LOG_FILE, mode="a", newline='', encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow([user_id, timestamp, question, response])
-
-
 if __name__ == '__main__':
+    # Загрузка переменных из среды
     load_dotenv()
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     LOG_FILE = "bot_logs.csv"
     OPENAI_KEY = os.getenv("OPENAI_KEY")
 
-    rag = make_rag(OPENAI_KEY)
+    # Запуск ДБ
+    engine = create_engine(os.getenv("DATABASE_URL"))
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-    if not os.path.exists(LOG_FILE):
-        with open(LOG_FILE, mode="w", newline='', encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(["user_id", "timestamp", "question", "response"])
-
-    
+    # Запуск РАГ
+    rag = make_rag(key=OPENAI_KEY)
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 

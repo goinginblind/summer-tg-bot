@@ -14,9 +14,11 @@ from langchain.prompts import ChatPromptTemplate
 import os
 import openai
 
+from datetime import datetime
+
 class RAGForChatBot():
 
-  def __init__(self, key=None, documents=None, llm=None, embedding_model=None, prompt_template=None, splitter=None, chunk_size=1000, overlap=200, n_chunks_to_pass=10, save_vdb=True, save_vdb_path='faiss_database_of_documents'):
+  def __init__(self, documents=None, llm=None, embedding_model=None, prompt_template=None, splitter=None, chunk_size=1000, overlap=200, n_chunks_to_pass=10, save_vdb=True, save_vdb_path='faiss_database_of_documents', vectorstore=None, make_db=False):
 
       if documents:
         self.docs = documents
@@ -37,31 +39,34 @@ class RAGForChatBot():
       self.save_vdb = save_vdb
       self.save_vdb_path = save_vdb_path
       self.n_chunks_to_pass = n_chunks_to_pass
+      self.make_db = make_db
+      self.vectorstore = vectorstore
 
       self._configure_everything()
-      
+
   def _configure_everything(self):
-      self.loader = UnstructuredWordDocumentLoader(self.docs)
-      self.documents = self.loader.load()
-      if self.splitter:
-        self.chunks = self.splitter.split_documents(self.documents)
-      else:
-        self.splitter = RecursiveCharacterTextSplitter(chunk_size=self.chunk_size, chunk_overlap=self.overlap)
-        self.chunks = self.splitter.split_documents(self.documents)  
-      self.vectorstore = FAISS.from_documents(documents=self.chunks[:5], embedding=self.embedding_model)
-      batch_size = 100
-      for i in range(5, len(self.chunks), batch_size):
-        batch = self.chunks[i:i+batch_size]
-        self.vectorstore.add_documents(batch)
-      if self.save_vdb:
-        self.vectorstore.save_local(self.save_vdb_path)
+      # self.loader = UnstructuredWordDocumentLoader(self.docs)
+      # self.documents = self.loader.load()
+      # if self.splitter:
+      #   self.chunks = self.splitter.split_documents(self.documents)
+      # else:
+      #   self.splitter = RecursiveCharacterTextSplitter(chunk_size=self.chunk_size, chunk_overlap=self.overlap)
+      #   self.chunks = self.splitter.split_documents(self.documents)
+      if self.make_db:
+        self.vectorstore = FAISS.from_documents(documents=self.chunks[:5], embedding=self.embedding_model)
+        batch_size = 100
+        for i in range(5, len(self.chunks), batch_size):
+          batch = self.chunks[i:i+batch_size]
+          self.vectorstore.add_documents(batch)
+        if self.save_vdb:
+          self.vectorstore.save_local(self.save_vdb_path)
       self.retriever = self.vectorstore.as_retriever(search_kwargs={'k':self.n_chunks_to_pass})
       print('configuration is completed successfully')
       return None
 
   def get_answer(self, query:str, prompt_template=None, args=None):
     if prompt_template:
-      template = prompt_template 
+      template = prompt_template
     else:
       template = self.prompt_template if self.prompt_template else None
     if not template:
@@ -75,26 +80,36 @@ class RAGForChatBot():
     args_for_template
     | template
     | self.llm
-
       )
+    print(type(args_for_template), type(template), type(self.llm))
     return chain.invoke(query)
 
-def make_rag(key):
-  loader = UnstructuredWordDocumentLoader('documents.docx', encoding='utf-8')
-  documents = loader.load()
-  splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-  chunks = splitter.split_documents(documents)
+def make_rag(db_path='docs', make_db=False, documents=None, key=''):
   llm = ChatOpenAI(openai_api_key=key, model_name="gpt-4o-mini", temperature=0)
   embedding = OpenAIEmbeddings(api_key=key, model="text-embedding-3-small")
-  vectorstore = FAISS.from_documents(documents=chunks[:5], embedding=embedding)
-  batch_size = 100
-  for i in range(5, len(chunks), batch_size):
-    batch = chunks[i:i+batch_size]
-    vectorstore.add_documents(batch)
-  vectorstore.save_local('docs')
-  retriever = vectorstore.as_retriever(search_kwargs={'k':10})
-  face = 'физическое лицо'
-  template = """
+  splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+  if make_db:
+    loader = UnstructuredWordDocumentLoader('documents.docx', encoding='utf-8')
+    documents = loader.load()
+    chunks = splitter.split_documents(documents)
+    vectorstore = FAISS.from_documents(documents=chunks[:5], embedding=embedding)
+    batch_size = 100
+    for i in range(5, len(chunks), batch_size):
+      batch = chunks[i:i+batch_size]
+      vectorstore.add_documents(batch)
+    vectorstore.save_local('docs')
+    #retriever = vectorstore.as_retriever(search_kwargs={'k':10})
+  else:
+    print(datetime.now())
+    vectorstore = FAISS.load_local('docs', embedding, allow_dangerous_deserialization=True)
+  return RAGForChatBot(documents='documents.docx', llm=llm, embedding_model=embedding, prompt_template=None, splitter=splitter, vectorstore=vectorstore)
+
+def get_answer_to_query(query, system_prompt, rag_model):
+    answer = rag_model.get_answer(query=query, prompt_template=system_prompt)
+    return answer.content
+
+def make_prompt(face='физических лиц', history='Отсутствует'):
+  prefix = f"""
   Ты — интеллектуальный помощник службы поддержки, обученный на внутренней документации тепловой электростанции (ТЭС), нормативно-правовых актах, технических регламентах, пользовательских инструкциях и архиве обращений.
 
   Твоя задача — **помогать пользователям с вопросами, связанными с функционированием, обслуживанием, правовым регулированием и пользовательскими сервисами ТЭС**, используя только те данные, которые предоставлены в документах ниже.
@@ -110,11 +125,17 @@ def make_rag(key):
   3. **Если информация отсутствует — прямо скажи, что в документах ничего не указано.**
   4. **При наличии нормативных ссылок (дат, номеров, законов) — приводи их дословно.**
   5. **Стиль ответа:** вежливый, нейтральный, понятный. Пиши как сотрудник службы поддержки, обращайся на "Вы".
-  6. **В документах есть информация как для физических, так и для юридических лиц. Тебе нужно тщательно вычленить информацию только для физичесмких лиц. Не добавляй никакой информации о другом лице, если этого явно не указано в запросе пользователя.
-
+  6. **В документах есть информация как для физических, так и для юридических лиц. Тебе нужно тщательно вычленить информацию только для {face}. Не добавляй никакой информации о других лиц, если этого явно не указано в запросе пользователя.
+  """
+  context = """
   Вот выдержки из внутренних документов, которые необходимо использовать:
   {docs}
-
+  """
+  history = f"""В случае, если пользователь уже задавал вопросы тебе и получал ответы, существует история вашей переписки. Ниже представлена эта история:
+  История: {history}
+  Ты можешь использователь эту историю для ответа на вопрос. Ососбенно это важно, если пользователь просит уточнить что-то или переписать ответ.
+  """
+  postfix = """
   Сформулируй краткий, точный и полезный ответ на основе этих материалов.
 
   Если требуется инструкция — перечисли шаги.
@@ -125,9 +146,10 @@ def make_rag(key):
   В качестве примера вывода формулы предлагаю тебе следующую формулу: что-то = что-то/что-то * что-то. !! используй ее как пример для вывода формулы, замени *что-то* на параметры из контекста
   Тебе нужно дать ответ на следующий вопрос:
   {query}
+  Начинай свой ответ с благодарности пользователя за вопрос. Не уточняй, что ты достаешь информацию для ответа из документов, до тех пор, пока пользователь напрямую это не попросит.
   Твой ответ с учетом контекста и всех поставленных выше условий:
   """
-  prompt_template = ChatPromptTemplate.from_template(template)
-  RAGForChatBot(documents='documents.docx', llm=llm, embedding_model=embedding, prompt_template=prompt_template, splitter=splitter)
-  return RAGForChatBot(documents='documents.docx', llm=llm, embedding_model=embedding, prompt_template=prompt_template, splitter=splitter)
 
+  template = prefix + context + history + postfix
+  prompt_template = ChatPromptTemplate.from_template(template)
+  return prompt_template
