@@ -1,36 +1,13 @@
-import os
-
-from chatgpt_md_converter import telegram_format
-
-from datetime import datetime
-
-from dotenv import load_dotenv
-
-from openai import OpenAI
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
+from telegram.ext import ContextTypes
 from database.queries import add_log, get_last_n_questions
-
-import markdown
-from bs4 import BeautifulSoup
-from telegram.helpers import escape_markdown
-
-from rag.rag import make_rag, make_prompt, get_answer_to_query, classifier, human_query_to_gpt_prompt
-
-import re
-
+from rag.rag import (
+    classifier,
+    get_answer_to_query,
+    human_query_to_gpt_prompt,
+    make_prompt,
+)
+from chatgpt_md_converter import telegram_format
 
 # Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
 user_states = {}
@@ -81,6 +58,9 @@ async def go_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_data = user_states.get(user_id)
+    session = context.application.session
+    rag = context.application.rag
+    OPENAI_KEY = context.application.OPENAI_KEY
 
     if not user_data or user_data.get("state") != "awaiting_question":
         return
@@ -123,30 +103,3 @@ async def ask_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text="Выберите, пожалуйста:",
         reply_markup=FACE_CHOICE_KEYBOARD
     )
-
-
-if __name__ == '__main__':
-    # Загрузка переменных из среды
-    load_dotenv()
-    BOT_TOKEN = os.getenv("BOT_TOKEN")
-    LOG_FILE = "bot_logs.csv"
-    OPENAI_KEY = os.getenv("OPENAI_KEY")
-
-    # Запуск ДБ
-    engine = create_engine(os.getenv("DATABASE_URL"))
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    # Запуск РАГ
-    rag = make_rag(key=OPENAI_KEY)
-
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_prefix_choice, pattern="^prefix:"))
-    app.add_handler(CallbackQueryHandler(go_back, pattern="^go_back$"))
-    app.add_handler(CallbackQueryHandler(ask_another, pattern="^ask_another$"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question))
-
-    print("Bot is running...")
-    app.run_polling()
