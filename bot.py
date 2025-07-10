@@ -1,5 +1,7 @@
 import os
-import csv
+
+from chatgpt_md_converter import telegram_format
+
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -19,9 +21,15 @@ from telegram.ext import (
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database.queries import add_log
+from database.queries import add_log, get_last_n_questions
 
-from rag.rag import make_rag, make_prompt, get_answer_to_query
+import markdown
+from bs4 import BeautifulSoup
+from telegram.helpers import escape_markdown
+
+from rag.rag import make_rag, make_prompt, get_answer_to_query, classifier, human_query_to_gpt_prompt
+
+import re
 
 
 # Юзер стейт: {user_id: {"face": "Физическое лицо", "query": "awaiting_question"}}
@@ -79,17 +87,28 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     face = user_data["prefix"]
     query = update.message.text
+
+    user_history_list = get_last_n_questions(session=session, user_id=user_id, n=10)
+    user_history = ""
+    for i in range(len(user_history_list)):
+        user_history += f"Классификация вопроса: {user_history_list[i].question_label}\nВопрос: {user_history_list[i].question}\nОтвет: {user_history_list[i].response}"
+
+    query = human_query_to_gpt_prompt(OPENAI_KEY, query=query)
+    label = classifier(OPENAI_KEY, query=query)
     
-    # ВОТ ТУТ БУДЕТ ПАРС В ЛЛМ И ПОЛУЧЕНИЕ ОТВЕТА
-    system_prompt=make_prompt(face=face)
+    # Парс вопроса и истории в ллм и получение ответа
+    system_prompt=make_prompt(face=face, history=user_history)
     answer = get_answer_to_query(query, system_prompt, rag)
 
     # Лог в ДБ
-    add_log(session=session, user_id=user_id, question=query, response=answer)
+    add_log(session=session, user_id=user_id, question=query, response=answer, question_label=label)
 
     # Отправляем юзеру
+    escaped_text = telegram_format(answer)  # Тут эскейп маркдауна
+
     await update.message.reply_text(
-        text=answer,
+        text=escaped_text,
+        parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("Задать другой вопрос", callback_data="ask_another")]
         ])
@@ -104,6 +123,7 @@ async def ask_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text="Выберите, пожалуйста:",
         reply_markup=FACE_CHOICE_KEYBOARD
     )
+
 
 if __name__ == '__main__':
     # Загрузка переменных из среды

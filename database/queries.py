@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from database.models import Log
 
-def add_log(session: Session, user_id: int, question: str, response: str):
-    log = Log(user_id=user_id, question=question, response=response)
+def add_log(session: Session, user_id: int, question: str, response: str, question_label: str):
+    log = Log(user_id=user_id, question=question, response=response, question_label=question_label)
     session.add(log)
     session.commit()
     session.refresh(log)

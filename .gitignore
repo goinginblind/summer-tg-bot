@@ -3,3 +3,4 @@
 *.pyc
 bot_logs.csv
 __pycache__
+docs/*

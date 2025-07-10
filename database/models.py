@@ -10,5 +10,6 @@ class Log(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     question = Column(String)
+    question_label = Column(String)
     response = Column(String)
     timestamp = Column(DateTime, default=datetime.now)
