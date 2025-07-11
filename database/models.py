@@ -13,3 +13,4 @@ class Log(Base):
     question_label = Column(String)
     response = Column(String)
     timestamp = Column(DateTime, default=datetime.now)
+    

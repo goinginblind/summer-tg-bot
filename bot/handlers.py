@@ -34,7 +34,7 @@ async def handle_prefix_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     # Удаляет предыдущее сообщение с кнопками для лиц
     await query.delete_message()
 
-    # Пропмпт для юзера чтоб вбил текстовый запрос
+    # Промпт для юзера чтоб вбил текстовый запрос
     back_button = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ Назад", callback_data="go_back")]
     ])
@@ -73,8 +73,8 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(len(user_history_list)):
         user_history += f"Классификация вопроса: {user_history_list[i].question_label}\nВопрос: {user_history_list[i].question}\nОтвет: {user_history_list[i].response}"
 
-    query = human_query_to_gpt_prompt(OPENAI_KEY, query=query)
     label = classifier(OPENAI_KEY, query=query)
+    query = human_query_to_gpt_prompt(OPENAI_KEY, query=query)
     
     # Парс вопроса и истории в ллм и получение ответа
     system_prompt=make_prompt(face=face, history=user_history)
