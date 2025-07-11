@@ -17,8 +17,8 @@ from chatgpt_md_converter import telegram_format
 user_states = {}  # {user_id: {"state": ..., "field_to_edit": ..., "pending_question": ...}}
 
 FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Физическое лицо", callback_data="prefix:Физическое лицо")],
-    [InlineKeyboardButton("Юридическое лицо", callback_data="prefix:Юридическое лицо")]
+    [InlineKeyboardButton("Я физическое лицо", callback_data="prefix:Физическое лицо")],
+    [InlineKeyboardButton("Я юридическое лицо", callback_data="prefix:Юридическое лицо")]
 ])
 
 PERSONAL_DATA_ENTRY_KEYBOARD = ReplyKeyboardMarkup([
@@ -39,13 +39,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(session, user_id)
     if user is None:
         await update.message.reply_text(
-            "Здравствуйте, я робот-помощник.\nВыберите, пожалуйста, категорию вопроса:",
+            """Здравствуйте! 
+            Меня зовут ЭнергосБот — ваш цифровой помощник от компании *«Иркутск Энергосбыт»*.  
+            Я могу помочь вам:  
+            ✅ Ответить на вопросы о тарифах, платежах и услугах.  
+            ✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.  
+            ✅ Принять и передать показания приборов учета.  
+            ✅ Связать вас с оператором, если нужна дополнительная помощь.  
+            Перед началом работы, пожалуйста, укажите Ваш статус.""",
             reply_markup=FACE_CHOICE_KEYBOARD
         )
         user_states[user_id] = {"state": "awaiting_face_choice"}
     else:
         await update.message.reply_text(
-            "Здравствуйте! Можете задать вопрос или изменить личные данные.",
+            """Здравствуйте! 
+
+Меня зовут ЭнергосБот — ваш цифровой помощник от компании «Иркутск Энергосбыт».  
+
+Я могу помочь вам:  
+✅ Ответить на вопросы о тарифах, платежах и услугах.  
+✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.  
+✅ Принять и передать показания приборов учета.  
+✅ Связать вас с оператором, если нужна дополнительная помощь.  
+
+Чем могу помочь вам сегодня?""",
             reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
         )
         user_states[user_id] = {"state": "awaiting_question"}
