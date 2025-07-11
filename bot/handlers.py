@@ -14,7 +14,7 @@ from database.mocked_queries import (
 from rag.rag import classifier, get_answer_to_query, make_prompt
 from chatgpt_md_converter import telegram_format
 
-user_states = {}  # {user_id: {"state": ..., "field_to_edit": ...}}
+user_states = {}  # {user_id: {"state": ..., "field_to_edit": ..., "pending_question": ...}}
 
 FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton("Физическое лицо", callback_data="prefix:Физическое лицо")],
@@ -22,7 +22,8 @@ FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
 ])
 
 PERSONAL_DATA_ENTRY_KEYBOARD = ReplyKeyboardMarkup([
-    [KeyboardButton("Изменить персональные данные")]
+    [KeyboardButton("Изменить персональные данные")],
+    [KeyboardButton("Изменить номер лица")]
 ], resize_keyboard=True, one_time_keyboard=False)
 
 PERSONAL_DATA_FIELD_CHOICES = InlineKeyboardMarkup([
@@ -35,7 +36,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     session = context.application.session
 
-    # Check if user is already in the DB
     user = get_user(session, user_id)
     if user is None:
         await update.message.reply_text(
@@ -56,7 +56,6 @@ async def handle_prefix_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = query.from_user.id
     face_type = query.data.split(":")[1]
 
-    # Save new user in DB
     create_user(context.application.session, user_id, face_type)
     user_states[user_id] = {"state": "awaiting_question"}
 
@@ -86,20 +85,23 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if query == "Изменить номер лица":
+        user_states[user_id] = {"state": "awaiting_face_number"}
+        await update.message.reply_text("Введите новый номер лица:")
+        return
+
     OPENAI_KEY = context.application.OPENAI_KEY
     rag = context.application.rag
 
     label = classifier(OPENAI_KEY, query=query)
 
-    if (
-        label in (
+    if label in (
             "2. Запрос на выдачу информации из личного кабинета",
             "3. Запрос на отправку информации в личный кабинет"
-        )
-        and user.face_number is None
-    ):
+        ) and user.face_number is None:
         await update.message.reply_text("Пожалуйста, введите ваш номер лица:")
         user_states[user_id]["state"] = "awaiting_face_number"
+        user_states[user_id]["pending_question"] = query
         return
 
     history = get_last_n_questions(session, user_id)
@@ -107,7 +109,8 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Классификация: {h.question_label}\nВопрос: {h.question}\nОтвет: {h.response}" for h in history
     ])
 
-    system_prompt = make_prompt(face=user.face_type, history=formatted_history)
+    acc_data = get_mocked_user_data(mock_session, user.face_number) if user.face_number else ""
+    system_prompt = make_prompt(face=user.face_type, history=formatted_history, acc_data=acc_data)
     answer = get_answer_to_query(query, system_prompt, rag)
 
     add_log(session, user_id, query, label, answer)
@@ -120,8 +123,9 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f">>> Received text: {update.message.text}")
     user_id = update.message.from_user.id
-    text = update.message.text
+    text = update.message.text.strip()
     session = context.application.session
     mock_session = context.application.mock_session
     state = user_states.get(user_id, {}).get("state")
@@ -129,7 +133,39 @@ async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if state == "awaiting_face_number":
         set_face_number(session, user_id, int(text))
         user_states[user_id]["state"] = "awaiting_question"
-        await update.message.reply_text("Спасибо! Теперь вы можете задать вопрос.")
+
+        query = user_states[user_id].pop("pending_question", None)
+        if query:
+            OPENAI_KEY = context.application.OPENAI_KEY
+            rag = context.application.rag
+
+            label = classifier(OPENAI_KEY, query=query)
+            history = get_last_n_questions(session, user_id)
+            formatted_history = "\n".join([
+                f"Классификация: {h.question_label}\nВопрос: {h.question}\nОтвет: {h.response}" for h in history
+            ])
+
+            user = get_user(session, user_id)
+            mocked_data = get_mocked_user_data(mock_session, user.face_number)
+            acc_data = mocked_user_data_to_prompt_string(mocked_data) if mocked_data else ""
+
+            system_prompt = make_prompt(
+                face=user.face_type,
+                history=formatted_history,
+                acc_data=acc_data
+            )
+            answer = get_answer_to_query(query, system_prompt, rag)
+
+            add_log(session, user_id, query, label, answer)
+            escaped_text = telegram_format(answer)
+
+            await update.message.reply_text(
+                text=escaped_text,
+                parse_mode="HTML",
+                reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
+            )
+        else:
+            await update.message.reply_text("Спасибо! Теперь вы можете задать вопрос.")
 
     elif state == "awaiting_edit_field_value":
         field = user_states[user_id].get("field_to_edit")
@@ -137,6 +173,9 @@ async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_mocked_user_field(mock_session, user.face_number, field, text)
         user_states[user_id]["state"] = "awaiting_question"
         await update.message.reply_text("Данные успешно обновлены.", reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD)
+
+    else:
+        await handle_question(update, context)
 
 async def handle_field_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -155,11 +194,16 @@ async def handle_field_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
-async def main_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Determine what to do based on current user state
-    state = user_states.get(update.message.from_user.id, {}).get("state")
-
-    if state in ("awaiting_face_number", "awaiting_edit_field_value"):
-        await handle_user_reply(update, context)
-    else:
-        await handle_question(update, context)
+def mocked_user_data_to_prompt_string(user_data) -> str:
+    if not user_data:
+        return "Нет данных пользователя."
+    
+    return (
+        f"Имя: {user_data.name}\n"
+        f"Телефон: {user_data.phone_number}\n"
+        f"Дата рождения: {user_data.date_of_birth}\n"
+        f"Счет за свет: {user_data.light_bill}₽\n"
+        f"Счет за отопление: {user_data.heat_bill}₽\n"
+        f"Счет за электричество: {user_data.electricity_bill}₽\n"
+        f"Задолженность: {user_data.debt}₽"
+    )

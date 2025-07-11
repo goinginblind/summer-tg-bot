@@ -17,7 +17,6 @@ from bot.handlers import (
     handle_question,
     handle_user_reply,
     handle_field_choice,
-    main_message_router
 )
 
 def run_bot():
@@ -51,8 +50,7 @@ def run_bot():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_prefix_choice, pattern="^prefix:"))
     app.add_handler(CallbackQueryHandler(handle_field_choice, pattern="^edit:"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, main_message_router))
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_reply))
 
     print("Bot is running...")
     app.run_polling()
