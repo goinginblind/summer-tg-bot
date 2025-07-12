@@ -99,7 +99,7 @@ python main.py
 ├── main.py                    # Точка входа: запуск бота
 ├── requirements.txt           # Зависимости Python
 ├── alembic.ini                # Конфиг Alembic для основной БД
-├── alembic_mocked.ini         # Конфиг Alembic для мока-БД
+├── alembic_mocked.ini         # Конфиг Alembic для БД-заглушки
 ├── .gitignore
 └── README.md                  # Этот файл
 ```
