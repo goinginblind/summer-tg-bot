@@ -130,7 +130,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     acc_data = get_mocked_user_data(mock_session, user.face_number) if user.face_number else ""
-    system_prompt = make_prompt(face=user.face_type, history=formatted_history, acc_data=acc_data)
+    system_prompt = make_prompt(face=user.face_type, history=formatted_history, acc_data=acc_data, label=label)  ## edit this out
     answer = get_answer_to_query(query, system_prompt, rag)
 
     add_log(session, user_id, query, label, answer)
