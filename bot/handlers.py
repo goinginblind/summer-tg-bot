@@ -39,31 +39,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(session, user_id)
     if user is None:
         await update.message.reply_text(
-            """Здравствуйте! 
-            Меня зовут ЭнергосБот — ваш цифровой помощник от компании *«Иркутск Энергосбыт»*.  
-            Я могу помочь вам:  
-            ✅ Ответить на вопросы о тарифах, платежах и услугах.  
-            ✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.  
-            ✅ Принять и передать показания приборов учета.  
-            ✅ Связать вас с оператором, если нужна дополнительная помощь.  
-            Перед началом работы, пожалуйста, укажите Ваш статус.""",
-            reply_markup=FACE_CHOICE_KEYBOARD
+            (
+            "<b>Здравствуйте!</b>\n\n"
+            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутск Энергосбыт»</b>.\n\n"
+            "Я могу помочь вам:\n"
+            "✅ Ответить на вопросы о тарифах, платежах и услугах.\n"
+            "✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.\n"
+            "✅ Принять и передать показания приборов учета.\n"
+            "✅ Связать вас с оператором, если нужна дополнительная помощь.\n\n"
+            "Перед началом работы, пожалуйста, укажите Ваш статус."
+            ),
+            reply_markup=FACE_CHOICE_KEYBOARD,
+            parse_mode="HTML"
         )
         user_states[user_id] = {"state": "awaiting_face_choice"}
     else:
         await update.message.reply_text(
-            """Здравствуйте! 
-
-Меня зовут ЭнергосБот — ваш цифровой помощник от компании «Иркутск Энергосбыт».  
-
-Я могу помочь вам:  
-✅ Ответить на вопросы о тарифах, платежах и услугах.  
-✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.  
-✅ Принять и передать показания приборов учета.  
-✅ Связать вас с оператором, если нужна дополнительная помощь.  
-
-Чем могу помочь вам сегодня?""",
-            reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
+            (
+            "<b>Здравствуйте!</b>\n\n"
+            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутск Энергосбыт»</b>.\n\n"
+            "Я могу помочь вам:\n"
+            "✅ Ответить на вопросы о тарифах, платежах и услугах.\n"
+            "✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.\n"
+            "✅ Принять и передать показания приборов учета.\n"
+            "✅ Связать вас с оператором, если нужна дополнительная помощь.\n\n"
+            "Чем могу помочь вам сегодня?"
+            ),
+            reply_markup=get_keyboard_if_face_set(context.application.session, user_id),
+            parse_mode="HTML"
         )
         user_states[user_id] = {"state": "awaiting_question"}
 
@@ -79,8 +82,8 @@ async def handle_prefix_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.delete_message()
     await context.bot.send_message(
         chat_id=query.message.chat_id,
-        text="Спасибо. Теперь можете задать вопрос или изменить данные.",
-        reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
+        text="Спасибо! Теперь вы можете задать интересующий Вас вопрос!",
+        reply_markup=get_keyboard_if_face_set(context.application.session, user_id)
     )
 
 async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,14 +100,14 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query == "Изменить персональные данные":
         await update.message.reply_text(
-            "Выберите, что вы хотите изменить:",
+            "Выберите, пожалуйста, что вы хотите изменить:",
             reply_markup=PERSONAL_DATA_FIELD_CHOICES
         )
         return
 
     if query == "Изменить номер лица":
         user_states[user_id] = {"state": "awaiting_face_number"}
-        await update.message.reply_text("Введите новый номер лица:")
+        await update.message.reply_text("Введите новый номер лицевого счета:")
         return
 
     OPENAI_KEY = context.application.OPENAI_KEY
@@ -116,7 +119,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "2. Запрос на выдачу информации из личного кабинета",
             "3. Запрос на отправку информации в личный кабинет"
         ) and user.face_number is None:
-        await update.message.reply_text("Пожалуйста, введите ваш номер лица:")
+        await update.message.reply_text("Пожалуйста, введите ваш номер лицевого счёта:")
         user_states[user_id]["state"] = "awaiting_face_number"
         user_states[user_id]["pending_question"] = query
         return
@@ -136,7 +139,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         text=escaped_text,
         parse_mode="HTML",
-        reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
+        reply_markup=get_keyboard_if_face_set(context.application.session, user_id)
     )
 
 async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -179,7 +182,7 @@ async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 text=escaped_text,
                 parse_mode="HTML",
-                reply_markup=PERSONAL_DATA_ENTRY_KEYBOARD
+                reply_markup=get_keyboard_if_face_set(context.application.session, user_id)
             )
         else:
             await update.message.reply_text("Спасибо! Теперь вы можете задать вопрос.")
@@ -224,3 +227,8 @@ def mocked_user_data_to_prompt_string(user_data) -> str:
         f"Счет за электричество: {user_data.electricity_bill}₽\n"
         f"Задолженность: {user_data.debt}₽"
     )
+
+
+def get_keyboard_if_face_set(session, user_id):
+    user = get_user(session, user_id)
+    return PERSONAL_DATA_ENTRY_KEYBOARD if user and user.face_number is not None else None
