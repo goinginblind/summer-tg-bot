@@ -111,7 +111,7 @@ python main.py
 - `BOT_TOKEN` — токен Telegram Bot API  
 - `OPENAI_KEY` — API-ключ OpenAI (эмбеддинги, классификация, чат)  
 - `DATABASE_URL` — DSN SQLAlchemy для основной БД  
-- `MOCKED_DB_URL` — DSN для мока-БД  
+- `MOCKED_DB_URL` — DSN для БД-заглушки  
 
 ---
 
