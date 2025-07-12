@@ -23,7 +23,7 @@ FACE_CHOICE_KEYBOARD = InlineKeyboardMarkup([
 
 PERSONAL_DATA_ENTRY_KEYBOARD = ReplyKeyboardMarkup([
     [KeyboardButton("Изменить персональные данные")],
-    [KeyboardButton("Изменить номер лица")]
+    [KeyboardButton("Изменить номер лицевого счета")]
 ], resize_keyboard=True, one_time_keyboard=False)
 
 PERSONAL_DATA_FIELD_CHOICES = InlineKeyboardMarkup([
@@ -41,7 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             (
             "<b>Здравствуйте!</b>\n\n"
-            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутск Энергосбыт»</b>.\n\n"
+            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутскэнергосбыт»</b>.\n\n"
             "Я могу помочь вам:\n"
             "✅ Ответить на вопросы о тарифах, платежах и услугах.\n"
             "✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.\n"
@@ -57,7 +57,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             (
             "<b>Здравствуйте!</b>\n\n"
-            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутск Энергосбыт»</b>.\n\n"
+            "Меня зовут ЭнергосБот — ваш цифровой помощник от компании <b>«Иркутскэнергосбыт»</b>.\n\n"
             "Я могу помочь вам:\n"
             "✅ Ответить на вопросы о тарифах, платежах и услугах.\n"
             "✅ Показать данные из личного кабинета: баланс, показания счетчиков, историю платежей.\n"
@@ -105,7 +105,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if query == "Изменить номер лица":
+    if query == "Изменить номер лицевого счета":
         user_states[user_id] = {"state": "awaiting_face_number"}
         await update.message.reply_text("Введите новый номер лицевого счета:")
         return
